@@ -43,3 +43,6 @@ tabulate
 pydap
 texttable
 latextable
+netCDF4
+xarray
+folium
