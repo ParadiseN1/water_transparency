@@ -46,3 +46,4 @@ latextable
 netCDF4
 xarray
 folium
+dask
