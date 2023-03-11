@@ -8,6 +8,7 @@ Diploma on water transparency
 docker run -d -it --init \
 --gpus=all \
 --volume="$PWD:/app" \
+--shm-size 40G \
 --publish="8891:8891" \
 --name watertrans \
 water_transparency bash
