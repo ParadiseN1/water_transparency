@@ -6,6 +6,8 @@ import torch
 
 d2r = np.pi / 180
 
+AVG_NAN_COUNT = 33659
+
 def latlon2xyz(lat, lon):
     if type(lat) == torch.Tensor:
         x = -torch.cos(lat)*torch.cos(lon)
@@ -30,15 +32,13 @@ def xyz2latlon(x, y, z):
     return lat, lon
 
 class ZsdDataset(Dataset):
-    def __init__(self, data_dir, training_time):
+    def __init__(self, data_dir, training_time, seq_len=10):
         super().__init__()
         self.y_start = training_time[0]
         self.y_end = training_time[1]
-        
+        self.seq_len = 10
         self.time = None
-
-        # self.idx_in = np.array(idx_in)
-        # self.idx_out = np.array(idx_out)
+        self.threshold = AVG_NAN_COUNT * 1.1 # empirical value, when all datapoints with NaNs due to sun illumination are above this threshold
 
         try:
             dataset = xr.open_mfdataset(
@@ -47,6 +47,13 @@ class ZsdDataset(Dataset):
             assert False and 'Please install the latest xarray, e.g.,' \
                                 'pip install  git+https://github.com/pydata/xarray/@v2022.03.0'
         dataset = dataset.sel(time=slice(self.y_start, self.y_end))
+        
+        ## Filter datapoints with NaNs
+        missing_values_count = dataset['ZSD'].isnull().sum(dim=['lon', 'lat'])
+        timestamps_below_threshold = (missing_values_count < self.threshold)
+        print(f'Filtered {timestamps_below_threshold.values.sum()}/{len(timestamps_below_threshold.values)}')
+        dataset = dataset.where(timestamps_below_threshold, drop=True)
+
 
         self.data = dataset.get('ZSD').values[:, np.newaxis, :, :]
 
@@ -61,12 +68,16 @@ class ZsdDataset(Dataset):
         #     1, self.data.shape[1], 1, 1)
 
         # self.data = (self.data-self.mean)/self.std
+        self.valid_idx = np.array(
+            range(0, self.data.shape[0]//seq_len-1))
     def __len__(self):
-        return self.data.shape[0]
+        return self.valid_idx.shape[0]
 
     def __getitem__(self, index):
-        data = torch.tensor(self.data[index])
-        return data
+        idx = self.valid_idx[index] * self.seq_len
+        x_data = torch.tensor(self.data[idx:idx+self.seq_len])
+        y_data = torch.tensor(self.data[idx+self.seq_len:idx+self.seq_len*2])
+        return x_data, y_data
 
 def load_data(batch_size,
               val_batch_size,
