@@ -3,6 +3,7 @@ import os.path as osp
 import numpy as np
 import xarray as xr
 import torch
+import random
 
 d2r = np.pi / 180
 
@@ -31,14 +32,28 @@ def xyz2latlon(x, y, z):
         lon = np.arctan2(-y, -x)
     return lat, lon
 
+def drop_last_column_if_odd(data):
+    lat_size = data.lat.size
+    lon_size = data.lon.size
+
+    lat_slice = slice(None, -1) if lat_size % 2 != 0 else slice(None)
+    lon_slice = slice(None, -1) if lon_size % 2 != 0 else slice(None)
+
+    return data.isel(lat=lat_slice, lon=lon_slice)
+
 class ZsdDataset(Dataset):
-    def __init__(self, data_dir, training_time, seq_len=10):
+    def __init__(self, data_dir, training_time, seq_len=10, out_seq_len=1, mean=None, std=None):
         super().__init__()
         self.y_start = training_time[0]
         self.y_end = training_time[1]
         self.seq_len = 10
+        self.out_seq_len = out_seq_len
         self.time = None
         self.threshold = AVG_NAN_COUNT * 1.1 # empirical value, when all datapoints with NaNs due to sun illumination are above this threshold
+        self.patch_h = 32
+        self.patch_w = 64
+        self.mean = mean
+        self.std = std
 
         try:
             dataset = xr.open_mfdataset(
@@ -46,7 +61,10 @@ class ZsdDataset(Dataset):
         except AttributeError:
             assert False and 'Please install the latest xarray, e.g.,' \
                                 'pip install  git+https://github.com/pydata/xarray/@v2022.03.0'
+        dataset = drop_last_column_if_odd(dataset)
         dataset = dataset.sel(time=slice(self.y_start, self.y_end))
+        
+        self.num_patches_per_image = len(dataset.lat.values)//self.patch_h * len(dataset.lon.values)//self.patch_w
         
         ## Filter datapoints with NaNs
         missing_values_count = dataset['ZSD'].isnull().sum(dim=['lon', 'lat'])
@@ -57,39 +75,43 @@ class ZsdDataset(Dataset):
 
         self.data = dataset.get('ZSD').values[:, np.newaxis, :, :]
 
-        self.min = self.data[~np.isnan(self.data)].min()
-        self.data = self.data - self.min
-        self.max = self.data[~np.isnan(self.data)].max()
-        self.data = self.data / self.max
-        self.data = np.nan_to_num(self.data, nan=-1)
-        # self.mean = self.data.mean(axis=(0, 2, 3)).reshape(
-        #     1, self.data.shape[1], 1, 1)
-        # self.std = self.data.std(axis=(0, 2, 3)).reshape(
-        #     1, self.data.shape[1], 1, 1)
+        if self.mean is None:
+            self.mean = self.data[self.data>0].mean()
+            self.std = self.data[self.data>0].std()
+        # self.min = self.data[~np.isnan(self.data)].min()
+        # self.data = self.data - self.min
+        # self.max = self.data[~np.isnan(self.data)].max()
+        # self.data = self.data / self.max
+        # self.data = np.nan_to_num(self.data, nan=-1)
 
-        # self.data = (self.data-self.mean)/self.std
+        self.data = (self.data-self.mean)/self.std
         self.valid_idx = np.array(
-            range(0, self.data.shape[0]//seq_len-1))
+            range(0, (self.data.shape[0]//seq_len-1) * self.num_patches_per_image))
     def __len__(self):
         return self.valid_idx.shape[0]
 
     def __getitem__(self, index):
-        idx = self.valid_idx[index] * self.seq_len
-        x_data = torch.tensor(self.data[idx:idx+self.seq_len])
-        y_data = torch.tensor(self.data[idx+self.seq_len:idx+self.seq_len*2])
+        idx = (self.valid_idx[index] // self.num_patches_per_image) * self.seq_len
+        # get random patch from image
+        lon_i = int(random.uniform(0, self.data.shape[-2]-self.patch_h))
+        lat_i = int(random.uniform(0, self.data.shape[-1]-self.patch_w))
+
+        x_data = torch.tensor(self.data[idx:idx+self.seq_len, :, lon_i:lon_i+self.patch_h, lat_i:lat_i+self.patch_w])
+        y_data = torch.tensor(self.data[idx+self.seq_len:idx+self.seq_len+self.out_seq_len, :, lon_i:lon_i+self.patch_h, lat_i:lat_i+self.patch_w])
         return x_data, y_data
 
 def load_data(batch_size,
               val_batch_size,
               data_dir,
               num_workers=4,
-              train_time=['1997', '2020'],
+            #   train_time=['1997', '2020'],
+              train_time=['1997', '1999'],
               val_time=['2020', '2021'],
               test_time=['2021', '2023'],
               **kwargs):
     train_set = ZsdDataset(data_dir=data_dir, training_time=train_time)
-    validation_set = ZsdDataset(data_dir, val_time)
-    test_set = ZsdDataset(data_dir, test_time)
+    validation_set = ZsdDataset(data_dir, val_time, mean=train_set.mean, std=train_set.std)
+    test_set = ZsdDataset(data_dir, test_time, mean=train_set.mean, std=train_set.std)
 
     dataloader_train = torch.utils.data.DataLoader(train_set,
                                                    batch_size=batch_size, shuffle=True,
@@ -105,4 +127,3 @@ def load_data(batch_size,
                                                   num_workers=num_workers)
 
     return dataloader_train, dataloader_vali, dataloader_test
-    # return dataloader_test
