@@ -181,18 +181,17 @@ class NonDistExperiment(object):
             metric_list, spatial_norm = ['mse', 'rmse', 'mae'], True
         else:
             metric_list, spatial_norm = ['mse', 'mae'], False
-        if 'zsd' in self.args.dataname.lower():
-            preds = torch.tensor(preds).to(self.device)
-            trues = torch.tensor(trues).to(self.device)
-            _, rmse = eval_metrics(preds, trues, vali_loader.dataset.std, vali_loader.dataset.mean, denormalize=False)
-            return rmse
-        eval_res, eval_log = metric(preds, trues, vali_loader.dataset.mean, vali_loader.dataset.std,
-                                    metrics=metric_list, spatial_norm=spatial_norm)
-        print_log('val\t '+eval_log)
-        if has_nni:
-            nni.report_intermediate_result(eval_res['mse'])
-
-        return val_loss
+        # if 'zsd' in self.args.dataname.lower():
+        preds = torch.tensor(preds).to(self.device)
+        trues = torch.tensor(trues).to(self.device)
+        _, rmse = eval_metrics(preds, trues, self.test_loader.dataset.std, self.test_loader.dataset.mean, denormalize=False)
+        return rmse
+        # eval_res, eval_log = metric(preds, trues, vali_loader.dataset.mean, vali_loader.dataset.std,
+        #                             metrics=metric_list, spatial_norm=spatial_norm)
+        # print_log('val\t '+eval_log)
+        # if has_nni:
+        #     nni.report_intermediate_result(eval_res['mse'])
+        # return val_loss
 
     def test(self):
         if self.args.test:
@@ -207,7 +206,7 @@ class NonDistExperiment(object):
         if 'zsd' in self.args.dataname.lower():
             preds = torch.tensor(preds).to(self.device)
             trues = torch.tensor(trues).to(self.device)
-            _, rmse = eval_metrics(preds, trues, self.test_loader.dataset.std, self.test_loader.dataset.mean, denormalize=False)
+            _, rmse = eval_metrics(preds, trues, self.test_loader.dataset.mean, self.test_loader.dataset.std)
             return rmse
         eval_res, eval_log = metric(preds, trues, self.test_loader.dataset.mean, self.test_loader.dataset.std,
                                     metrics=metric_list, spatial_norm=spatial_norm)

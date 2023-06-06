@@ -11,6 +11,7 @@ N_S = 2
 lr = 5e-3
 batch_size = 32
 drop_path = 0.1
-warmup_epoch = 0
+sched = 'cosine'
+warmup_epoch = 5
 
-# python ./SimVPv2/tools/non_dist_train.py -d ZsdChl --lr 1e-3 -c ./SimVPv2/configs/zsd/SimVP.py --ex_name ZsdChl
+# nohup python ./SimVPv2/tools/non_dist_train.py -d ZsdChl --lr 1e-3 -c ./SimVPv2/configs/zsd/SimVP.py --ex_name ZsdChl > logs.txt &
