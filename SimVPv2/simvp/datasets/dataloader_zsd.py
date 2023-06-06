@@ -5,6 +5,7 @@ import xarray as xr
 import torch
 from PIL import Image
 import random
+import time
 
 d2r = np.pi / 180
 
@@ -99,6 +100,7 @@ class ZsdDataset(Dataset):
         return self.valid_idx.shape[0]
 
     def __getitem__(self, index):
+        start_time = time.time()
         idx = (self.valid_idx[index] // self.num_patches_per_image)
         # get random patch from image
         while True:
@@ -109,12 +111,14 @@ class ZsdDataset(Dataset):
                 continue
             break
         x_data = torch.tensor(self.data[idx:idx+self.seq_len, :, lon_i:lon_i+self.patch_h, lat_i:lat_i+self.patch_w]).to(torch.float32)
+        elapsed_time = time.time() - start_time
+        print(f"Load batch took {elapsed_time} seconds to run.")
         return x_data, y_data
 
 def load_data(batch_size,
               val_batch_size,
               data_dir,
-              num_workers=4,
+              num_workers=16,
               train_time=['1997', '2020'],
               val_time=['2020', '2021'],
               test_time=['2021', '2023'],

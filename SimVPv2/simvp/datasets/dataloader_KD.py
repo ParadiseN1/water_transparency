@@ -60,7 +60,7 @@ class ZsdDataset(Dataset):
         print(data_dir)
         try:
             dataset = xr.open_mfdataset(
-                data_dir+'/*.nc', combine='by_coords')[['ZSD']]
+                data_dir+'/*.nc', combine='by_coords')[['ZSD', 'KD490']]
         except AttributeError:
             assert False and 'Please install the latest xarray, e.g.,' \
                                 'pip install  git+https://github.com/pydata/xarray/@v2022.03.0'
@@ -71,7 +71,7 @@ class ZsdDataset(Dataset):
         
         ## Filter datapoints with NaNs
         missing_values_count = dataset['ZSD'].isnull().sum(dim=['lon', 'lat'])
-        # missing_values_count1 = dataset['CHL'].isnull().sum(dim=['lon', 'lat'])
+        # missing_values_count1 = dataset['KD'].isnull().sum(dim=['lon', 'lat'])
         timestamps_below_threshold = (missing_values_count < self.threshold)
         print(f'Filtered {timestamps_below_threshold.values.sum()}/{len(timestamps_below_threshold.values)}')
         dataset = dataset.where(timestamps_below_threshold, drop=True)
@@ -79,16 +79,23 @@ class ZsdDataset(Dataset):
 
 
         self.zsd_data = dataset.get('ZSD').values[:, np.newaxis, :, :]
+        self.KD_data = dataset.get('KD490').values[:, np.newaxis, :, :]
+
+        if self.mean is None:
+            self.mean = self.zsd_data[self.zsd_data>0].mean()
+            self.std = self.zsd_data[self.zsd_data>0].std()
         
+        self.zsd_data = np.concatenate([self.zsd_data, self.KD_data], axis=1)
         if surface_mask:
             self.surface_mask = np.array(Image.open(data_dir+"/surface_mask.png"))[...,0] / 255.
             self.zsd_data = self.zsd_data*self.surface_mask[:self.zsd_data.shape[-2], :self.zsd_data.shape[-1]]
             
 
-        if self.mean is None:
-            self.mean = self.zsd_data[self.zsd_data>0].mean()
-            self.std = self.zsd_data[self.zsd_data>0].std()
-        self.zsd_data = (self.zsd_data-self.mean)/self.std
+        self.zsd_data[:,0,...] = (self.zsd_data[:,0,...]-self.mean)/self.std
+
+        print(f"KD mean:{self.zsd_data[:,1,...][self.zsd_data[:,1,...] > 0].mean()}")
+        print(f"KD std:{self.zsd_data[:,1,...][self.zsd_data[:,1,...] > 0].std()}")
+        self.zsd_data[:,1,...] = (self.zsd_data[:,1,...]-self.zsd_data[:,1,...][self.zsd_data[:,1,...] > 0].mean())/self.zsd_data[:,1,...][self.zsd_data[:,1,...]>0].std()
         # if self.min == None:
         #     self.min = self.zsd_data[~np.isnan(self.zsd_data)].min()
         # self.zsd_data = self.zsd_data - self.min

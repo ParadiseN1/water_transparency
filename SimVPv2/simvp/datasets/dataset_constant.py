@@ -1,11 +1,23 @@
 dataset_parameters = {
+    'ZsdChlKD': {
+        'in_shape': [10, 3, 32, 64],
+        'pre_seq_length': 10,
+        'aft_seq_length': 1,
+        'total_length': 11
+    },
+    'ZsdKD': {
+        'in_shape': [10, 2, 32, 64],
+        'pre_seq_length': 10,
+        'aft_seq_length': 1,
+        'total_length': 11
+    },
     'ZsdChl': {
         'in_shape': [10, 2, 32, 64],
         'pre_seq_length': 10,
         'aft_seq_length': 1,
         'total_length': 11
     },
-    'SimpleZsdDataset': {
+    'transparencyDataset': {
         # 'in_shape': [10, 1, 337, 384],
         'in_shape': [10, 1, 32, 64],
         'pre_seq_length': 10,

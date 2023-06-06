@@ -21,11 +21,20 @@ def load_data(dataname, batch_size, val_batch_size, num_workers, data_root, **kw
     elif 'simple' in dataname.lower():
         from .dataloader_zsd_simple import load_data
         return load_data(batch_size, val_batch_size, data_root, num_workers, **kwargs)
-    elif 'zsdchl' in dataname.lower():
+    elif 'transparency' in dataname.lower():
         from .dataloader_transparency import load_data
         return load_data(batch_size, val_batch_size, data_root, num_workers, **kwargs)
-    elif 'zsd' in dataname.lower():
-        from .dataloader_zsd import load_data
+    # elif 'zsd' in dataname.lower():
+    #     from .dataloader_zsd import load_data
+    #     return load_data(batch_size, val_batch_size, data_root, num_workers, **kwargs)
+    elif 'zsdchlkd' in dataname.lower():
+        from .dataloader_CHL_KD import load_data
+        return load_data(batch_size, val_batch_size, data_root, num_workers, **kwargs)
+    elif 'zsdchl' in dataname.lower():
+        from .dataloader_CHL import load_data
+        return load_data(batch_size, val_batch_size, data_root, num_workers, **kwargs)
+    elif 'zsdkd' in dataname.lower():
+        from .dataloader_KD import load_data
         return load_data(batch_size, val_batch_size, data_root, num_workers, **kwargs)
     else:
         raise ValueError(f'Dataname {dataname} is unsupported')

@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from simvp.models import SimVP_Model
 from .base_method import Base_method
 import wandb
+import time
 
 class SimVP(Base_method):
     r"""SimVP
@@ -57,10 +58,19 @@ class SimVP(Base_method):
         train_pbar = tqdm(train_loader)
         for batch_x, batch_y in train_pbar:
             self.model_optim.zero_grad()
+            start_time = time.time()
             batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
-            pred_y = self._predict(batch_x)
 
+            infer_time = time.time()
+            pred_y = self._predict(batch_x)
+            elapsed_time = time.time() - infer_time
+            print(f"Forward took {elapsed_time} seconds to run.")
+
+            loss_time = time.time()
             loss = self.criterion(pred_y[batch_y != -777], batch_y[batch_y != -777])
+            elapsed_time = time.time() - loss_time
+            print(f"Loss time took {elapsed_time} seconds to run.")
+            back_time = time.time()
             loss.backward()
             self.model_optim.step()
             if not self.by_epoch:
@@ -68,6 +78,9 @@ class SimVP(Base_method):
 
             num_updates += 1
             loss_mean += loss.item()
+            elapsed_time = time.time() - back_time
+            print(f"Backward took {elapsed_time} seconds to run.")
+            wandb_time = time.time()
             if wandb.run is not None:
                 batch_y[batch_y != -777] = batch_y[batch_y != -777]*train_loader.dataset.std + train_loader.dataset.mean
                 pred_y[batch_y != -777] = pred_y[batch_y != -777]*train_loader.dataset.std + train_loader.dataset.mean
@@ -76,7 +89,12 @@ class SimVP(Base_method):
                 train_rmse = F.mse_loss(pred_y, batch_y).sqrt().item()
 
                 wandb.log({"Train RMSE:": train_rmse})
+            elapsed_time = time.time() - wandb_time
+            print(f"Wandb log took {elapsed_time} seconds to run.")
             losses_m.update(loss.item(), batch_x.size(0))
+            elapsed_time = time.time() - start_time
+            print(f"Iteration took {elapsed_time} seconds to run.")
+
             # if loss.item() > 1_000:
             #     print(batch_x.shape)
 
@@ -92,6 +110,8 @@ class SimVP(Base_method):
         preds_lst, trues_lst, total_loss = [], [], []
         vali_pbar = tqdm(vali_loader)
         for i, (batch_x, batch_y) in enumerate(vali_pbar):
+            if i % 20 != 0:
+                continue
             batch_x, batch_y = batch_x.to(self.device), batch_y.to(self.device)
             pred_y = self._predict(batch_x)
             batch_y[batch_y != -777] = batch_y[batch_y != -777]*vali_loader.dataset.std + vali_loader.dataset.mean
@@ -102,9 +122,6 @@ class SimVP(Base_method):
 
             list(map(lambda data, lst: lst.append(data.detach().cpu().numpy()
                                                   ), [pred_y, batch_y], [preds_lst, trues_lst]))
-
-            if i * batch_x.shape[0] > 1000:
-                break
     
             vali_pbar.set_description('vali loss: {:.4f}'.format(loss.mean().sqrt().item()))
             total_loss.append(loss.mean().sqrt().item())

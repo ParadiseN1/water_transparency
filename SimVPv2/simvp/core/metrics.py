@@ -22,15 +22,15 @@ def calculate_accuracy(y_gt, y_pred, min_m=2, max_m=5):
         acc = _calculate_accuracy(y_gt, y_pred, meters=meters).item()
         accs.append(acc)
         print(f'Accuracy for {meters} m. range:{acc:.3f}')
-        if wandb.run is not None:
-            wandb.log({f"Accuracy {meters}m.":acc})
+        # if wandb.run is not None:
+        #     wandb.log({f"Accuracy {meters}m.":acc})
     return accs
 
 def calculate_rmse(y_gt, y_pred):
     rmse = F.mse_loss(y_gt, y_pred).sqrt().item()
     print(f'RMSE for predicted frame: {rmse:.3f}')
-    if wandb.run is not None:
-            wandb.log({f"RMSE":rmse})
+    # if wandb.run is not None:
+    #         wandb.log({f"RMSE":rmse})
     return rmse
 
 def relative_rmse(y_gt, y_pred):

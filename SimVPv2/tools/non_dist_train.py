@@ -21,7 +21,7 @@ if __name__ == '__main__':
     args = create_parser().parse_args()
     config = args.__dict__
 
-    wandb.init(project="simvp2_secchi_depth", name="Zsd_Chl, (32,64) patches")
+    wandb.init(project="simvp2_secchi_depth", name=args.ex_name)
     # wandb.init(project="simvp2_secchi_depth", name="test MMNIST")
     if has_nni:
         tuner_params = nni.get_next_parameter()

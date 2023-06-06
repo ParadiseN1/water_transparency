@@ -1,0 +1,7 @@
+data
+.ipynb_checkpoints
+notebooks/.ipynb_checkpoints
+notebooks/motu
+notebooks/motuclient
+results
+results1
